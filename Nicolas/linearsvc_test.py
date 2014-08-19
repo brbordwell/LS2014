@@ -19,12 +19,20 @@ unknown = np.ones(len(eliptical), dtype=bool) & (~eliptical) & (~spiral)
 classes = eliptical * 1 + spiral * 2 + unknown * 3
 
 # Select training data from raw data without classification features... OR ELSE THAT WOULD BE CHEATING!! ;)
-svn_names = [x for x in data.dtype.names if x != "p_el_debiased" and x != "p_cs_debiased"]
+svn_names = [x for x in data.dtype.names if x != "p_el_debiased" and x != "p_cs_debiased" and x != "objid"]
 data_svm = data[svn_names]
 
+# From structured array to nparray
+data_svm = data_svm.view(np.float64).reshape(data_svm.shape + (-1,))
+
 clf = svm.LinearSVC()
-X_train, X_test, y_train, y_test = cross_validation.train_test_split(data_svm, classes)
+X_train, X_test, y_train, y_test = cross_validation.train_test_split(data_svm, classes, test_size=1./3.)
 print "training set = ", X_train.shape, y_train.shape
 print "test size = ", X_test.shape, y_test.shape
-clf.fit(data_svm, classes.transpose())
+clf.fit(X_train, y_train)
 print clf
+pred_class = clf.predict(X_test)
+N_match = (pred_class == y_test).sum()
+print "N_match = ", N_match
+acc = 1. * N_match / len(pred_class)
+print "Accuracy = ", acc
