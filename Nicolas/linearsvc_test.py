@@ -18,7 +18,7 @@ classes = data
 svn_names = [x for x in data.dtype.names if x != "p_el_debiased" and x != "p_cs_debiased"]
 data_svm = data[svn_names]
 
-"clf = svm.LinearSVC()
+#clf = svm.LinearSVC()
 X_train, X_test, y_train, y_text = cross_validation.train_test_split(data_svm, classes)
 print "training set = ", X_train.shape, y_train.shape
 print "test size = ", X_test.shape, y_test.shape
