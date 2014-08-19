@@ -2,6 +2,10 @@ import os
 import numpy as np
 import pylab as pl
 
+"""
+Small script for testing visualization
+"""
+
 file_path = os.path.join(os.path.dirname(__file__), os.pardir, 'Data', 'GalaxyZooTraining_CherenkovRad.csv')
 data = np.genfromtxt(file_path, delimiter=',', names=True)
 eliptical, spiral, u, g, i, z = data['p_el_debiased'] > .8, data['p_cs_debiased'] > .8, data['u'], data['g'], data['i'], data['z']
