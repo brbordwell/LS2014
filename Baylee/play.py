@@ -10,7 +10,7 @@ from glob import glob
 import pylab as pl
 
 
-
+#CONVERT CLASSES TO NUMBERS YO, VERY IMPORTANT
 
 class Table:
     """A class for the data object. """
@@ -143,60 +143,120 @@ def pregunta(csvfile, tag=False):
         return [[tags],[defs]]
 
 
-
-
-
+def cls(clss,inv=False):
+    """Making the classes more like classes"""
+    
+    if inv:
+        iclss = np.zeros((max(clss)+1,len(clss)))
+        for i in xrange(iclss.shape[0]):
+            ind = np.where(clss == i)
+            iclss[i][ind] = 1
+        return iclss
+    else:
+        clss = np.array(clss)
+        clss[np.where(clss EQ 0)] = -100
+        clss[1] += 1
+        clss[2] += 2
+        return clss[np.where(clss GT 0)]
+    
 
 
 
 
 #Hokay, so we have the table class to get the data and work with the attributes, now we need to play with the machine learning aspects. I would like to add exploratory aspects to the table class to allow visual exploration of the parameter space as well.
 
-def learn(fyle,params,cvd_size=1/3.,simple=True, simplest=False):
-    """Holds all the ML stuff"""
+def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True, 
+          simplest=False,param_grid=None):
+    """FUNCTION: LEARN(FYLE,PARAMS,CLF,CVD_SIZE,SIMPLE,SIMPLEST)
+    PURPOSE: Holds all the ML stuff
+    INPUT:
+      fyle = The file with training data.
+      params = The parameters to be used.
+      clf = The ML fitter to be used.
+      cvd_size = The split size of the amount of data to be used as the
+                 test set.
+      simple = Cross validation, one test, no variation (Default)
+      simplest = No cross validation, one test, no variation. 
+      param_grid = If simple and simplest are both off then function will 
+                   perform a grid search through fitting parameters.
+      
+    OUTPUT:
+      The trained fitter function object.
+      """
 
     cl_names = ["spiral","elliptical","uncertain"]
     attr = [p for p in params if p not in cl_names]
     #weights = would be interesting to repopulate the paramaterspace on the basis of the unbiased probabilities from galaxy zoo
-
     
+
+    #Woo data
     data = Table(train,params)
     data.attr = attr  ;  data.clss = cl_names
     names = data.tags
 
 
+    #Without intense shuffling (faster)
     if simplest:
-        pass
-    else:
-        if simple:
-            clf = svm.SVC()
-            data.split(cvd_size)
-            scores = cvd.cross_val_score(clf, 
-                                         data.data[0], 
-                                         data.data[1], 
-                                         cv = data.mixed)
-        
+        data.split(cvd_size,cv=False)
+        clf.fit(data.train[0], cls(data.train[1]))
+        pred = clf.pred(data.test[0], cls(data.test[1]))
+        acc = (pred == data.test[1]).sum()/len(data.test[1])
+        return clf.pred()
 
-    #Note: using GSCV requires at least 2 values in the grid
+    #With intense shuffling (slower)
+    else:
+        #Working with fixed values of C and kernel params...
+        data.split(cvd_size)
+        if simple:
+            scores = cvd.cross_val_score(clf, 
+                                         data.sel(data.attr), 
+                                         cls(data.sel(data.clss)), 
+                                         cv = data.mixed)
+            acc = scores.mean()
+            return clf.pred()
+            
+        #Ranging through parameter space of C and the kernel params...
         else:
-            C_range = None
-            param_grid = dict(C=C_range)
-            grid = GSCV(svm.SVC(), 
+            grid = GSCV(clf, 
                         param_grid = param_grid, 
                         cv = data.mixed)
-            grid.fit(data.train[0],data.train[1])
+            grid.fit(data.sel(data.attr),
+                     cls(data.sel(data.clss)))
+            
+            if False: #Too lazy to comment
+                scores = cvd.cross_val_score(grid.best_estimator_, 
+                                             data.sel(data.attr), 
+                                             cls(data.sel(data.clss)), 
+                                             cv = data.mixed)
+                acc = scores.mean()
+            
+            return grid.best_estimator_
+
+   
+
+
+
+def apply(fitter, datafile, params):
+    """Work that unclassified data yo"""
+    #Setup
+    cl_names = ["spiral","elliptical","uncertain"]
+    attr = [p for p in params if p not in cl_names]
+
+    #Fit
+    data = Table(datafile,params)    
+    data.attr = attr  ;  data.clss = cl_names
+    res = cls(fitter.predict(data.data)),inv=True)
+
+    #Save
+    names = params  ;  for cl in cl_names: names.append(cl)
+    s = data.data.shape  ;  if s[0] > s[1]: data.data.transpose()
+    data = np.append(data,res,axis=1)
+    save_name = data_file[0:-5]+'_classd.csv'
+    np.savetxt(save_name,,delimiter=',')
+
 
 
     
-
-    #print clf
-
-    clss_pred = clf.predict(data.test[0])
-    N_match = (clss_pred == data.test[1]).sum()
-    
-
-
-
-
 def wrapper():
     """This function will make the necessary calls to learn and apply"""
+    pass
