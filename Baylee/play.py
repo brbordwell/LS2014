@@ -12,7 +12,7 @@ import plotter
 import threading
 from threading import Thread
 from itertools import ifilter
-import pickle
+import cPickle as pickle
 
 
 
@@ -42,8 +42,8 @@ class Table:
         on specific schema"""
     
         if tags == None: tags=self.params
-        if N == None: tags=self.N
-        if cut == None: tags=self.cut
+        if N == None: N=2**self.N
+        if cut == None: cut=self.cut
 
         #Expanding the filename
         csvfile = self.name
@@ -81,8 +81,8 @@ class Table:
             dat = np.genfromtxt(filt, delimiter=',', names=names, 
                                  dtype='float64', skip_header=1, usecols=inds)
             l = np.max(dat[0].shape)
-            if l > Num:
-                inds = range(Num) 
+            if l > N:
+                inds = range(N) 
                 for a in xrange(5): shuffle(inds)
                 return dat[inds]
             else:
@@ -243,6 +243,15 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
       The trained fitter function object.
       """
 
+    if simple: diff='medium'
+    else:
+        if simplest: diff='easy'
+        else: diff='hard'
+
+    save_name = "{kernel}_P{prob}_N{N}_{diff}_fitvals.pkl".format(kernel='linear', prob=str(cut), N=Num, diff=diff )
+
+
+
     #cl_names = ["spiral","elliptical","uncertain"]
     cl_names = ["p_el_debiased","p_cs_debiased"]
     attr = [p for p in params if p not in cl_names]
@@ -261,8 +270,12 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
         clf.fit(data.train[0], cls(data.train[1],cut))
         pred = clf.pred(data.test[0], cls(data.test[1],cut))
         acc = (pred == data.test[1]).sum()/len(data.test[1])
-        
-        np.savez()
+        std = 0
+
+        with open(save_name,'wb') as output:
+            pr = pickle.Pickler(output,-1)
+            pr.dump(clf.pred())  ;   pr.dump(acc) ; pr.dump(std)
+
         return clf.pred(), acc, 0
 
     #With intense shuffling (slower)
@@ -275,6 +288,10 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
                                          cls(data.sel(data.clss),cut), 
                                          cv = data.mixed)
             acc = scores.mean()  ;  std = scores.std()
+
+            with open(save_name,'wb') as output:
+                pr = pickle.Pickler(output,-1)
+                pr.dump(clf.pred())  ;   pr.dump(acc) ; pr.dump(std)
             return clf.pred(), acc, std
             
         #Ranging through parameter space of C and the kernel params...
@@ -291,6 +308,9 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
                                          cv = data.mixed)
             acc = scores.mean()  ;  std = scores.std()
             
+            with open(save_name,'wb') as output:
+                pr = pickle.Pickler(output,-1)
+                pr.dump(clf.pred())  ;   pr.dump(acc) ; pr.dump(std)
             return grid.best_estimator_, acc, std
 
    
@@ -334,8 +354,8 @@ def wrapper(fyle=None, count=None, prep=False):
         Args[-1] = crange  ;  Args[-3] = False
         fitter = learn(*Args)
 
-        #Find the best number of samples to use
 
+        #Find the best number of samples to use
         Args[1] = fitter   ;  Args[-3] = True  ; Args[-1] = None
         N = 2**np.arange(5,17)
         for n in 0, xrange(len(N)):
@@ -346,10 +366,6 @@ def wrapper(fyle=None, count=None, prep=False):
         t.join()
  #should keep all threads running until the most complicated thread finishes
 
-
-
-        #Save them
-        parm_fit = 
 
 
     else:
