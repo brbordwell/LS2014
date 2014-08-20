@@ -63,6 +63,7 @@ class Table:
         #Getting the desired selection of the data
         fyle = open(csvfile,'rb')
         names = csv.reader(fyle).next()
+        fyle.close()
 
         if tags:
             if type(tags[0]) == str: 
@@ -254,9 +255,9 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=2**20,
     else:
         if simplest: diff='easy'
         else: diff='hard'
-    Numd = np.log(Num)/np.log(2)
+    Numd = int(np.log(Num)/np.log(2))
 
-    save_name = "{kernel}_P{prob}_N{N}_{diff}_fitvals.pkl".format(kernel='linear', prob=str(cut), N=Numd, diff=diff )
+    save_name = "Results/{kernel}_P{prob}_N{N}_{diff}_fitvals.pkl".format(kernel='linear', prob=str(cut), N=Numd, diff=diff )
 
 
 
@@ -351,11 +352,11 @@ def wrapper(fyle=None, div=None, count=None, prep=False):
     if len(sys.argv) > 2: prep = sys.argv[-1]
 
     names = [i.replace('\n','') for i in open(fyle).readline() if i != 'objID']
-    crange=dict(C=10**np.arange(-4,4))    
     Args = (fyle,names,svm.LinearSVC(),1/3.,.8,2**20,True,False,None,True,)    
 
     if prep:
         #Find the best training parameters for C
+        crange=dict(C=10**np.arange(-4,4))    
         Args[-2] = crange  ;  Args[-4] = False  
         fil = learn(*Args)
         
@@ -363,9 +364,11 @@ def wrapper(fyle=None, div=None, count=None, prep=False):
         #Find the best number of samples to use
         with open(fil,'rb') as obj:
             objeto = pickle.load(obj)
-        Args[1] = objeto   ;  Args[-4] = True  ; Args[-2] = None
+        Args[2] = objeto   ;  Args[-4] = True  ; Args[-2] = None
         N = 2**np.arange(5,20)
-        
+
+
+ #should keep all threads running until the most complicated thread finishes   
         for n in N:
             Args[-5] = n
             t = Thread(target=learn, args=Args)
@@ -386,12 +389,25 @@ def wrapper(fyle=None, div=None, count=None, prep=False):
         crit = crit[1:]
         ind = np.where(crit == crit.max)+3
         N = N[ind]
- #should keep all threads running until the most complicated thread finishes
+        d = open('Nscore.txt','wb')
+        d.write(N)
+        d.write(ind)
+        d.write(crit)
+        d.close()
+
 
     else:
         if div == None: div = sys.argv[1]
         if count == None: count = sys.argv[2]
         probabilities = np.arange(.05,.95,div)
+
+        N = float(open('Nscore.txt','wb').readline())
+        Num = int(np.log(N)/np.log(2))
+        search = glob('Results/*Nd*fitvals.pkl'.format(Nd=Num))
+        with open(search,'rb') as obj:
+                objeto = pickle.load(obj)
+
+        Args[2] = objeto
         Args[4] = probabilities[count]
         learn(*Args)
 
