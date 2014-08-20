@@ -223,7 +223,7 @@ def cls_old(clss,inv=False):
 #Hokay, so we have the table class to get the data and work with the attributes, now we need to play with the machine learning aspects. I would like to add exploratory aspects to the table class to allow visual exploration of the parameter space as well.
 
 def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
-          simple=True,simplest=False,param_grid=None):
+          simple=True,simplest=False,param_grid=None, save=False):
     """FUNCTION: LEARN(FYLE,PARAMS,CLF,CVD_SIZE,SIMPLE,SIMPLEST)
     PURPOSE: Holds all the ML stuff
     INPUT:
@@ -271,12 +271,8 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
         pred = clf.pred(data.test[0], cls(data.test[1],cut))
         acc = (pred == data.test[1]).sum()/len(data.test[1])
         std = 0
+        fit = clf.pred()
 
-        with open(save_name,'wb') as output:
-            pr = pickle.Pickler(output,-1)
-            pr.dump(clf.pred())  ;   pr.dump(acc) ; pr.dump(std)
-
-        return clf.pred(), acc, 0
 
     #With intense shuffling (slower)
     else:
@@ -288,11 +284,8 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
                                          cls(data.sel(data.clss),cut), 
                                          cv = data.mixed)
             acc = scores.mean()  ;  std = scores.std()
-
-            with open(save_name,'wb') as output:
-                pr = pickle.Pickler(output,-1)
-                pr.dump(clf.pred())  ;   pr.dump(acc) ; pr.dump(std)
-            return clf.pred(), acc, std
+            fit = clf.pred()
+    
             
         #Ranging through parameter space of C and the kernel params...
         else:
@@ -306,14 +299,17 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
                                          data.sel(data.attr), 
                                          cls(data.sel(data.clss),cut), 
                                          cv = data.mixed)
-            acc = scores.mean()  ;  std = scores.std()
-            
-            with open(save_name,'wb') as output:
-                pr = pickle.Pickler(output,-1)
-                pr.dump(clf.pred())  ;   pr.dump(acc) ; pr.dump(std)
-            return grid.best_estimator_, acc, std
+            acc = scores.mean()  ;  std = scores.std()            
+            fit =  grid.best_estimator_
 
-   
+    if save:
+        with open(save_name,'wb') as output:
+            pr = pickle.Pickler(output,-1)
+            pr.dump(fit)  ;   pr.dump(acc) ; pr.dump(std)
+        return save_name
+    else:
+        return, fit, acc, std
+
 
 
 
@@ -347,16 +343,18 @@ def wrapper(fyle=None, count=None, prep=False):
     if len(sys.argv) > 2: prep = sys.argv[2]
     names = [i.replace('\n','') for i in open(fyle).readline() if i != 'objID']
     crange=dict(C=10**np.arange(-4,4))    
-    Args = (fyle,names,svm.LinearSVC(),1/3.,.8,20,True,False,None,)    
+    Args = (fyle,names,svm.LinearSVC(),1/3.,.8,20,True,False,None,True,)    
 
     if prep:
         #Find the best training parameters for C
-        Args[-1] = crange  ;  Args[-3] = False
-        fitter = learn(*Args)
-
+        Args[-2] = crange  ;  Args[-4] = False  
+        fil = learn(*Args)
+        
 
         #Find the best number of samples to use
-        Args[1] = fitter   ;  Args[-3] = True  ; Args[-1] = None
+        with open(fil,'rb') as obj:
+            objeto = pickle.load(obj)
+        Args[1] = objeto.fit   ;  Args[-4] = True  ; Args[-2] = None
         N = 2**np.arange(5,17)
         for n in 0, xrange(len(N)):
             t = Thread(target=learn, args=Args)
@@ -366,7 +364,11 @@ def wrapper(fyle=None, count=None, prep=False):
         t.join()
  #should keep all threads running until the most complicated thread finishes
 
-
-
     else:
         if count == None: count = sys.argv[1]
+        probabilities = np.arange(.05,.95,count)
+        for prob in probabilities:
+            Args[5] = prob
+            learn(*Args)
+
+
