@@ -148,7 +148,7 @@ def cls(clss,inv=False):
     
     if inv:
         iclss = np.zeros((max(clss)+1,len(clss)))
-        for i in range(iclss.shape[0]):
+        for i in xrange(iclss.shape[0]):
             ind = np.where(clss == i)
             iclss[i][ind] = 1
         return iclss
@@ -165,14 +165,26 @@ def cls(clss,inv=False):
 
 #Hokay, so we have the table class to get the data and work with the attributes, now we need to play with the machine learning aspects. I would like to add exploratory aspects to the table class to allow visual exploration of the parameter space as well.
 
-def learn(fyle,params,cvd_size=1/3.,simple=True, simplest=False):
-    """Holds all the ML stuff"""
+def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True, simplest=False):
+    """FUNCTION: LEARN(FYLE,PARAMS,CLF,CVD_SIZE,SIMPLE,SIMPLEST)
+    PURPOSE: Holds all the ML stuff
+    INPUT:
+      fyle = 
+      params = 
+      clf = 
+      cvd_size = 
+      simple = 
+      simplest = 
+      
+    OUTPUT:
+      """
 
     cl_names = ["spiral","elliptical","uncertain"]
     attr = [p for p in params if p not in cl_names]
     #weights = would be interesting to repopulate the paramaterspace on the basis of the unbiased probabilities from galaxy zoo
-
     
+
+    #Woo data
     data = Table(train,params)
     data.attr = attr  ;  data.clss = cl_names
     names = data.tags
@@ -180,7 +192,6 @@ def learn(fyle,params,cvd_size=1/3.,simple=True, simplest=False):
 
     #Without intense shuffling (faster)
     if simplest:
-        clf = svm.SVC()
         data.split(cvd_size,cv=False)
         clf.fit(data.train[0], cls(data.train[1]))
         pred = clf.pred(data.test[0], cls(data.test[1]))
@@ -190,7 +201,6 @@ def learn(fyle,params,cvd_size=1/3.,simple=True, simplest=False):
     #With intense shuffling (slower)
     else:
         #Working with fixed values of C and kernel params...
-        clf = svm.SVC()
         data.split(cvd_size)
         if simple:
             scores = cvd.cross_val_score(clf, 
