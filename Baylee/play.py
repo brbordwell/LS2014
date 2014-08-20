@@ -165,18 +165,23 @@ def cls(clss,inv=False):
 
 #Hokay, so we have the table class to get the data and work with the attributes, now we need to play with the machine learning aspects. I would like to add exploratory aspects to the table class to allow visual exploration of the parameter space as well.
 
-def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True, simplest=False):
+def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True, 
+          simplest=False,param_grid=None):
     """FUNCTION: LEARN(FYLE,PARAMS,CLF,CVD_SIZE,SIMPLE,SIMPLEST)
     PURPOSE: Holds all the ML stuff
     INPUT:
-      fyle = 
-      params = 
-      clf = 
-      cvd_size = 
-      simple = 
-      simplest = 
+      fyle = The file with training data.
+      params = The parameters to be used.
+      clf = The ML fitter to be used.
+      cvd_size = The split size of the amount of data to be used as the
+                 test set.
+      simple = Cross validation, one test, no variation (Default)
+      simplest = No cross validation, one test, no variation. 
+      param_grid = If simple and simplest are both off then function will 
+                   perform a grid search through fitting parameters.
       
     OUTPUT:
+      The trained fitter function object.
       """
 
     cl_names = ["spiral","elliptical","uncertain"]
@@ -212,8 +217,6 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True, simplest=Fa
             
         #Ranging through parameter space of C and the kernel params...
         else:
-            C_range = None
-            param_grid = dict(C=C_range)
             grid = GSCV(clf, 
                         param_grid = param_grid, 
                         cv = data.mixed)
@@ -230,6 +233,8 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True, simplest=Fa
             return grid.best_estimator_
 
    
+
+
 
 def apply(fitter, datafile, params):
     """Work that unclassified data yo"""
