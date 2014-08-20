@@ -1,38 +1,50 @@
-# !/bin/User/bin/python
-
+import sys
 import csv
 import numpy as np
+from numpy.random import shuffle
 import astropy.io.fits as fits
 from sklearn import svm
 from sklearn import cross_validation as cvd
 from sklearn.grid_search import GridSearchCV as GSCV
 from glob import glob
 import pylab as pl
+import plotter
+import threading
+from threading import Thread
+from itertools import ifilter
+import pickle
 
 
-#CONVERT CLASSES TO NUMBERS YO, VERY IMPORTANT
+
 
 class Table:
     """A class for the data object. """
 
-    def __init__(self,fyle,parms):
+    def __init__(self,fyle,parms,N,cut):
         self.name = fyle
         self.params = parms
         self.data = getdata(fyle,params)
+        self.N = N
+        self.cut = cut
         self.attr = []
         self.clss = []
         self.train = [[],[]]
         self.test = [[],[]]
         self.mixed = []
+        
 
     def __str__(self):
         return self.name
 
 
-    def getdata(self, tags=self.params):
+    def getdata(self, tags=None, N=None, cut=None):
         """This function will create arrays from the csvfile based
         on specific schema"""
     
+        if tags == None: tags=self.params
+        if N == None: tags=self.N
+        if cut == None: tags=self.cut
+
         #Expanding the filename
         csvfile = self.name
         check = glob(csvfile)
@@ -59,18 +71,33 @@ class Table:
                 self.tags = [names[i] for i in self.attr]
 
         else: inds = range(len(names))
-        np.genfromtxt(csvfile, delimiter=',',names=names, dtype='float64',
-                      skip_header=1, usecols=inds)
-    
+
+        with open(csvfile) as table:
+            def crit(x,cut):
+                x = x[0].split(',')
+                return x[1] > cut and x[2]
+
+            filt = ifilter(crit(x,cut), table)
+            dat = np.genfromtxt(filt, delimiter=',', names=names, 
+                                 dtype='float64', skip_header=1, usecols=inds)
+            l = np.max(dat[0].shape)
+            if l > Num:
+                inds = range(Num) 
+                for a in xrange(5): shuffle(inds)
+                return dat[inds]
+            else:
+                return dat
 
     def sel(self,tags):
         """Grab part of the data"""
         part = np.array([self.data[tag] for tag in tags])
 
         siz = part.shape  
-        if len(siz) > 1: if siz[0] > siz[1]: part = part.transpose()
+        if len(siz) > 1: 
+            if siz[0] > siz[1]: part = part.transpose()
 
         return part
+
 
 
     def split(self,size,cv=True):
@@ -79,13 +106,12 @@ class Table:
         if cv:
             data.mixed = cvd.StratifiedShuffleSplit(self.clss,5,test_size = size)
         else:
-            self.train[0],self.test[0],self.train[1],self.test[1] = 
-            cvd.train_test_split(
+            self.train[0],self.test[0],self.train[1],self.test[1] = cvd.train_test_split(
                 self.sel(self.attr),
                 self.sel(self.clss),
                 test_size=size)
 
-            self.data = [] #avoiding weighing python down, can replace using getdata
+            self.data = [] #avoiding weighing python down,getdata will recreate
 
 
 
@@ -114,10 +140,21 @@ def pregunta(csvfile, tag=False):
     """This function will create lists from the csvfile so that the schema 
     are slightly more searchable"""
     
+    #Expanding the filename
+    check = glob(csvfile)
+    if len(check) != 1:
+        print "ERROR: Name of file given is not unique"
+        return
+    else:
+        if len(check) == 0:
+            print "ERROR: No matching file"
+            return
+        else:
+            csvfile = check[0]
+
     #Setting up the reader
     fyle = open(csvfile,'rb')
     rdr = csv.reader(fyle)
-
 
     #Reading in the table
     table = []  ;  run = 1
@@ -127,12 +164,9 @@ def pregunta(csvfile, tag=False):
         except:
             run = 0
 
-
     #Obtaining the schema tags
     tags = [x[0] for x in table]  ;  tags = tags[1:]
     defs = [x[-1] for x in table]  ;  defs = defs[1:]
-
-    
 
     #Matching the tags
     if tag:
@@ -143,7 +177,30 @@ def pregunta(csvfile, tag=False):
         return [[tags],[defs]]
 
 
-def cls(clss,inv=False):
+
+
+def cls(clss,p_cutoff=.8,inv=False):
+    """Making the classes more like classes"""
+    clss = clss > p_cutoff
+
+    if inv:
+        iclss = np.zeros((max(clss)+1,len(clss)))
+        for i in xrange(iclss.shape[0]):
+            ind = np.where(clss == i)
+            iclss[i][ind] = 1
+        return iclss
+
+    else:
+        clss = np.array(clss)
+        clss[np.where(clss == 0)] = -100
+        for i in xrange(clss.shape[0])+1: clss[i] += i
+
+        return clss[np.where(clss > 0)]
+
+
+
+
+def cls_old(clss,inv=False):
     """Making the classes more like classes"""
     
     if inv:
@@ -154,10 +211,10 @@ def cls(clss,inv=False):
         return iclss
     else:
         clss = np.array(clss)
-        clss[np.where(clss EQ 0)] = -100
+        clss[np.where(clss == 0)] = -100
         clss[1] += 1
         clss[2] += 2
-        return clss[np.where(clss GT 0)]
+        return clss[np.where(clss > 0)]
     
 
 
@@ -165,8 +222,8 @@ def cls(clss,inv=False):
 
 #Hokay, so we have the table class to get the data and work with the attributes, now we need to play with the machine learning aspects. I would like to add exploratory aspects to the table class to allow visual exploration of the parameter space as well.
 
-def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True, 
-          simplest=False,param_grid=None):
+def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
+          simple=True,simplest=False,param_grid=None):
     """FUNCTION: LEARN(FYLE,PARAMS,CLF,CVD_SIZE,SIMPLE,SIMPLEST)
     PURPOSE: Holds all the ML stuff
     INPUT:
@@ -175,6 +232,8 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True,
       clf = The ML fitter to be used.
       cvd_size = The split size of the amount of data to be used as the
                  test set.
+      cut = The value for the probability of being eliptical or spiral that 
+            I use to distinguish them from the unknowns. 
       simple = Cross validation, one test, no variation (Default)
       simplest = No cross validation, one test, no variation. 
       param_grid = If simple and simplest are both off then function will 
@@ -184,13 +243,14 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True,
       The trained fitter function object.
       """
 
-    cl_names = ["spiral","elliptical","uncertain"]
+    #cl_names = ["spiral","elliptical","uncertain"]
+    cl_names = ["p_el_debiased","p_cs_debiased"]
     attr = [p for p in params if p not in cl_names]
     #weights = would be interesting to repopulate the paramaterspace on the basis of the unbiased probabilities from galaxy zoo
     
 
     #Woo data
-    data = Table(train,params)
+    data = Table(train,params,Num,cut)
     data.attr = attr  ;  data.clss = cl_names
     names = data.tags
 
@@ -198,10 +258,12 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True,
     #Without intense shuffling (faster)
     if simplest:
         data.split(cvd_size,cv=False)
-        clf.fit(data.train[0], cls(data.train[1]))
-        pred = clf.pred(data.test[0], cls(data.test[1]))
+        clf.fit(data.train[0], cls(data.train[1],cut))
+        pred = clf.pred(data.test[0], cls(data.test[1],cut))
         acc = (pred == data.test[1]).sum()/len(data.test[1])
-        return clf.pred()
+        
+        np.savez()
+        return clf.pred(), acc, 0
 
     #With intense shuffling (slower)
     else:
@@ -210,10 +272,10 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True,
         if simple:
             scores = cvd.cross_val_score(clf, 
                                          data.sel(data.attr), 
-                                         cls(data.sel(data.clss)), 
+                                         cls(data.sel(data.clss),cut), 
                                          cv = data.mixed)
-            acc = scores.mean()
-            return clf.pred()
+            acc = scores.mean()  ;  std = scores.std()
+            return clf.pred(), acc, std
             
         #Ranging through parameter space of C and the kernel params...
         else:
@@ -221,42 +283,74 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,simple=True,
                         param_grid = param_grid, 
                         cv = data.mixed)
             grid.fit(data.sel(data.attr),
-                     cls(data.sel(data.clss)))
+                     cls(data.sel(data.clss),cut))
             
-            if False: #Too lazy to comment
-                scores = cvd.cross_val_score(grid.best_estimator_, 
-                                             data.sel(data.attr), 
-                                             cls(data.sel(data.clss)), 
-                                             cv = data.mixed)
-                acc = scores.mean()
+            scores = cvd.cross_val_score(grid.best_estimator_, 
+                                         data.sel(data.attr), 
+                                         cls(data.sel(data.clss),cut), 
+                                         cv = data.mixed)
+            acc = scores.mean()  ;  std = scores.std()
             
-            return grid.best_estimator_
+            return grid.best_estimator_, acc, std
 
    
 
 
 
-def apply(fitter, datafile, params):
+def apply(fitter, datafile, params, cut, Num):
     """Work that unclassified data yo"""
     #Setup
     cl_names = ["spiral","elliptical","uncertain"]
     attr = [p for p in params if p not in cl_names]
 
     #Fit
-    data = Table(datafile,params)    
+    data = Table(datafile,params,Num,cut)    
     data.attr = attr  ;  data.clss = cl_names
-    res = cls(fitter.predict(data.data)),inv=True)
+    res = cls(fitter.predict(data.data),cut,inv=True)
 
     #Save
-    names = params  ;  for cl in cl_names: names.append(cl)
-    s = data.data.shape  ;  if s[0] > s[1]: data.data.transpose()
+    names = params    
+    for cl in cl_names: names.append(cl)
+    s = data.data.shape  
+    if s[0] > s[1]: data.data.transpose()
     data = np.append(data,res,axis=1)
     save_name = data_file[0:-5]+'_classd.csv'
-    np.savetxt(save_name,,delimiter=',')
+    np.savetxt(save_name,data,delimiter=',')
 
 
 
     
-def wrapper():
-    """This function will make the necessary calls to learn and apply"""
-    pass
+def wrapper(fyle=None, count=None, prep=False):
+    """This function will make the necessary (highly specific) calls to learn and apply. AKA this is the shitty, not-pretty function"""
+
+    if fyle == None: fyle = sys.argv[0]
+    if len(sys.argv) > 2: prep = sys.argv[2]
+    names = [i.replace('\n','') for i in open(fyle).readline() if i != 'objID']
+    crange=dict(C=10**np.arange(-4,4))    
+    Args = (fyle,names,svm.LinearSVC(),1/3.,.8,20,True,False,None,)    
+
+    if prep:
+        #Find the best training parameters for C
+        Args[-1] = crange  ;  Args[-3] = False
+        fitter = learn(*Args)
+
+        #Find the best number of samples to use
+
+        Args[1] = fitter   ;  Args[-3] = True  ; Args[-1] = None
+        N = 2**np.arange(5,17)
+        for n in 0, xrange(len(N)):
+            t = Thread(target=learn, args=Args)
+            if n < len(N)-1: t.daemon(True)
+            t.start()
+
+        t.join()
+ #should keep all threads running until the most complicated thread finishes
+
+
+
+        #Save them
+        parm_fit = 
+
+
+    else:
+        if count == None: count = sys.argv[1]
