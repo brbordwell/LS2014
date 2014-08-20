@@ -7,13 +7,17 @@ import itertools
 Small script for testing Linear SVC with cross-validation
 """
 
+NUM_OF_ROWS = 10000
+
+
+
 # Select file and load raw data into a matrix
 file_path = os.path.join(os.path.dirname(__file__), os.pardir, 'data_csv', 'GalaxyZooData.csv')
 #data = np.genfromtxt(file_path, delimiter=',', names=True).transpose()
 
 #file_path = os.path.join(os.path.dirname(__file__), os.pardir, 'data_csv', 'GalaxyZooData_2.csv')
 with open(file_path) as t_in:
-	data = np.genfromtxt(itertools.islice(t_in, 10001), delimiter=',', names=True).transpose()
+	data = np.genfromtxt(itertools.islice(t_in, NUM_OF_ROWS+1), delimiter=',', names=True).transpose()
 
 # Generate a vector of classes
 eliptical, spiral = data['p_el_debiased'] > .8, data['p_cs_debiased'] > .8
