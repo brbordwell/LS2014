@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import sys
 import csv
 import numpy as np
@@ -23,7 +25,7 @@ class Table:
     def __init__(self,fyle,parms,N,cut):
         self.name = fyle
         self.params = parms
-        self.data = getdata(fyle,params)
+        self.data = getdata(fyle,params,N,cut)
         self.N = N
         self.cut = cut
         self.attr = []
@@ -42,7 +44,7 @@ class Table:
         on specific schema"""
     
         if tags == None: tags=self.params
-        if N == None: N=2**self.N
+        if N == None: N = self.N
         if cut == None: cut=self.cut
 
         #Expanding the filename
@@ -74,16 +76,21 @@ class Table:
 
         with open(csvfile) as table:
             def crit(x,cut):
-                x = x[0].split(',')
-                return x[1] > cut and x[2]
+                #avoiding first line
+                try:
+                    x = float(x[0].split(','))
+                    return x[1] >= cut and x[2] >= cut
+                except:
+                    return 0
 
             filt = ifilter(crit(x,cut), table)
             dat = np.genfromtxt(filt, delimiter=',', names=names, 
-                                 dtype='float64', skip_header=1, usecols=inds)
-            l = np.max(dat[0].shape)
+                                 dtype='float64', usecols=inds)
+            l = np.max(dat.shape)
             if l > N:
-                inds = range(N) 
+                inds = range(l) 
                 for a in xrange(5): shuffle(inds)
+                index = [inds[i] for i in xrange(N)]
                 return dat[inds]
             else:
                 return dat
@@ -222,7 +229,7 @@ def cls_old(clss,inv=False):
 
 #Hokay, so we have the table class to get the data and work with the attributes, now we need to play with the machine learning aspects. I would like to add exploratory aspects to the table class to allow visual exploration of the parameter space as well.
 
-def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
+def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=2**20,
           simple=True,simplest=False,param_grid=None, save=False):
     """FUNCTION: LEARN(FYLE,PARAMS,CLF,CVD_SIZE,SIMPLE,SIMPLEST)
     PURPOSE: Holds all the ML stuff
@@ -247,8 +254,9 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
     else:
         if simplest: diff='easy'
         else: diff='hard'
+    Numd = np.log(Num)/np.log(2)
 
-    save_name = "{kernel}_P{prob}_N{N}_{diff}_fitvals.pkl".format(kernel='linear', prob=str(cut), N=Num, diff=diff )
+    save_name = "{kernel}_P{prob}_N{N}_{diff}_fitvals.pkl".format(kernel='linear', prob=str(cut), N=Numd, diff=diff )
 
 
 
@@ -308,7 +316,7 @@ def learn(fyle,params,clf=svm.LinearSVC(),cvd_size=1/3.,cut=.8,Num=20,
             pr.dump(fit)  ;   pr.dump(acc) ; pr.dump(std)
         return save_name
     else:
-        return, fit, acc, std
+        return fit, acc, std
 
 
 
@@ -336,14 +344,15 @@ def apply(fitter, datafile, params, cut, Num):
 
 
     
-def wrapper(fyle=None, count=None, prep=False):
+def wrapper(fyle=None, div=None, count=None, prep=False):
     """This function will make the necessary (highly specific) calls to learn and apply. AKA this is the shitty, not-pretty function"""
 
     if fyle == None: fyle = sys.argv[0]
-    if len(sys.argv) > 2: prep = sys.argv[2]
+    if len(sys.argv) > 2: prep = sys.argv[-1]
+
     names = [i.replace('\n','') for i in open(fyle).readline() if i != 'objID']
     crange=dict(C=10**np.arange(-4,4))    
-    Args = (fyle,names,svm.LinearSVC(),1/3.,.8,20,True,False,None,True,)    
+    Args = (fyle,names,svm.LinearSVC(),1/3.,.8,2**20,True,False,None,True,)    
 
     if prep:
         #Find the best training parameters for C
@@ -354,21 +363,44 @@ def wrapper(fyle=None, count=None, prep=False):
         #Find the best number of samples to use
         with open(fil,'rb') as obj:
             objeto = pickle.load(obj)
-        Args[1] = objeto.fit   ;  Args[-4] = True  ; Args[-2] = None
-        N = 2**np.arange(5,17)
-        for n in 0, xrange(len(N)):
+        Args[1] = objeto   ;  Args[-4] = True  ; Args[-2] = None
+        N = 2**np.arange(5,20)
+        
+        for n in N:
+            Args[-5] = n
             t = Thread(target=learn, args=Args)
             if n < len(N)-1: t.daemon(True)
             t.start()
-
+            
         t.join()
+        acc = np.array([])  ;  std = acc.copy()
+        for n in 0, xrange(len(N)):
+            with open(fil,'rb') as obj:
+                objeto = pickle.load(obj)
+                acc = acc.append(pickle.load(obj))
+                std = std.append(pickle.load(obj))
+
+                
+        crit = np.array(
+            [np.abs(std[i-1]-std[i])/std[i] for i in xrange(len(N)-1)+1])
+        crit = crit[1:]
+        ind = np.where(crit == crit.max)+3
+        N = N[ind]
  #should keep all threads running until the most complicated thread finishes
 
     else:
-        if count == None: count = sys.argv[1]
-        probabilities = np.arange(.05,.95,count)
-        for prob in probabilities:
-            Args[5] = prob
-            learn(*Args)
+        if div == None: div = sys.argv[1]
+        if count == None: count = sys.argv[2]
+        probabilities = np.arange(.05,.95,div)
+        Args[4] = probabilities[count]
+        learn(*Args)
 
 
+
+
+
+
+
+
+#RUN THE GAUNTLET
+if __name__ == '__main__': wrapper()
