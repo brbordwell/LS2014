@@ -25,13 +25,13 @@ data_svm = data.view(np.float64).reshape(data.shape + (-1,))
 
 # Identify elipticals and spirals
 index_el, index_cs, index_objid = data.dtype.names.index('p_el_debiased'), data.dtype.names.index('p_cs_debiased'), data.dtype.names.index('objid')
+elliptical, spiral = data_svm[:, index_el] > .8, data_svm[:, index_cs] > .8
 
 # Filter the unknowns
-elliptical, spiral = data_svm[:, index_el] > .8, data_svm[:, index_cs] > .8
-data_svm = data_svm[elliptical | spiral]
+#data_svm = data_svm[elliptical | spiral]
+#elliptical, spiral = data_svm[:, index_el] > .8, data_svm[:, index_cs] > .8
 
 # Get classes
-spiral = data_svm[:, index_cs] > .8
 classes = np.zeros(len(spiral), dtype=bool) | spiral
 
 # Generate a vector of classes
