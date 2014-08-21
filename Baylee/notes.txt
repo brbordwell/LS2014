@@ -1,0 +1,19 @@
+HPC plan:
+- have a prep keyword to figure out ideal values of C and N
+    -make sure that when working with N we randomize our selection of values from the data set
+    -use all for C
+
+-remove objid in code-->DONE
+
+-make sure we save the choices made (C,N) and the general results of these fits for plotting in the report
+
+-change getdata to select the data used 663748 --->DONE
+
+-use less than Num data points in the function---->DONE
+   -make magical list of indices to feed genfromtxt
+   	 from itertools import ifilter
+	 
+	 with open(file) as inp
+
+	      filt = ifilter(lamda x: x[1] > prob and x[2] > prob,inp)
+	      genfromtxt(filt)
