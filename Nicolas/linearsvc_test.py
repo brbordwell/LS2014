@@ -4,13 +4,14 @@ import itertools
 import numpy as np
 import matplotlib.pyplot as plt
 
+import seaborn as sns
+
+
 """
 Small script for testing Linear SVC with cross-validation
 """
 
 NUM_OF_ROWS = 10000
-
-
 
 # Select file and load raw data into a matrix
 file_path = os.path.join(os.path.dirname(__file__), os.pardir, 'data_csv', 'GalaxyZooData.csv')
@@ -48,6 +49,7 @@ data_svm = np.delete(data_svm, 0, 1)
 
 clf = svm.SVC(kernel='linear')
 
+# Train with data doing cross validation
 X_train, X_test, y_train, y_test = cross_validation.train_test_split(data_svm, classes, test_size=1./3.)
 print "training set = ", X_train.shape, y_train.shape
 print "test size = ", X_test.shape, y_test.shape
@@ -59,6 +61,7 @@ print "N_match = ", N_match
 acc = 1. * N_match / len(pred_class)
 print "Accuracy = ", acc
 
+# Compute ROC curve
 fpr, tpr, _ = metrics.roc_curve(y_test, y_score)
 roc_auc = metrics.auc(fpr, tpr)
 
