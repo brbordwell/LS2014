@@ -3,6 +3,9 @@ HPC plan:
     -make sure that when working with N we randomize our selection of values from the data set
     -use all for C
 
+the point at which the difference in the differences in the accuracies is the maximum
+
+
 -remove objid in code-->DONE
 
 -make sure we save the choices made (C,N) and the general results of these fits for plotting in the report
