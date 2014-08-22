@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 parser = argparse.ArgumentParser(description="Plot ROC curve from test data classes and classification scores.")
-parser.add_argument('in_file_path', type=str, help='Path of the input csv file.')
+parser.add_argument('in_file_path', type=str, help='Path of the input npz file with data.')
 
 args = parser.parse_args()
 
